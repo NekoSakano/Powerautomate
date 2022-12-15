@@ -1,0 +1,58 @@
+const Teams = require('msteams-sdk');
+const { exec } = require('child_process');
+
+// Replace the values in angle brackets with your own values
+const teams = new Teams({
+  appId: '<your-app-id>',
+  appPassword: '<your-app-password>',
+});
+
+// Create a new event subscription for incoming calls
+teams.api.subscriptions.create({
+  resource: 'messages',
+  event: 'created',
+  filter: 'resourceGroup eq \'Call\' and resource eq \'CallSubscription\'',
+  expirationDateTime: '2022-12-31T00:00:00.0000000Z',
+  notificationUrl: '<your-notification-url>',
+}).then(() => {
+  console.log('Subscription created');
+});
+
+// Create a new event subscription for upcoming meetings
+teams.api.subscriptions.create({
+  resource: 'meetings',
+  event: 'created',
+  filter: `start/dateTime ge '${new Date().toISOString()}' and start/timeZone eq '${Intl.DateTimeFormat().resolvedOptions().timeZone}'`,
+  expirationDateTime: '2022-12-31T00:00:00.0000000Z',
+  notificationUrl: '<your-notification-url>',
+}).then(() => {
+  console.log('Subscription created');
+});
+
+// Define a function to handle incoming call and meeting notifications
+function handleNotification(event) {
+  // Check if the notification is for an incoming call or an upcoming meeting
+  if (event.resource === 'messages' && event.resourceGroup === 'Call' && event.resource === 'CallSubscription') {
+    // Handle incoming call notification
+    handleCallNotification(event);
+  } else if (event.resource === 'meetings') {
+    // Handle upcoming meeting notification
+    handleMeetingNotification(event);
+  }
+}
+
+// Define a function to handle incoming call notifications
+function handleCallNotification(event) {
+  // Open the Windows volume mixer
+  exec('SndVol.exe -f');
+}
+
+// Define a function to handle upcoming meeting notifications
+function handleMeetingNotification(event) {
+  // Calculate the time 3 minutes before the meeting start time
+  const meetingStartTime = new Date(event.start.dateTime);
+  const threeMinutesBeforeMeeting = new Date(meetingStartTime.getTime() - 3 * 60 * 1000);
+
+  // Schedule a task to open the Windows volume mixer at the calculated time
+  exec(`schtasks /create /tn "Open volume mixer" /tr "SndVol.exe -f" /sc once /st ${threeMinutesBeforeMeeting.toTimeString()}`);
+}
